@@ -3,8 +3,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# ── Deployment ────────────────────────────────────────────────────────────────
+ENVIRONMENT    = os.getenv("ENVIRONMENT", "development")
+LOG_LEVEL      = os.getenv("LOG_LEVEL", "INFO")
+PORT           = int(os.getenv("PORT", "10000"))
+WORKERS        = int(os.getenv("WORKERS", "1"))
+API_SECRET_KEY = os.getenv("API_SECRET_KEY", "dev-secret-key")
+
+# ── Database ──────────────────────────────────────────────────────────────────
 # Database mode: "demo" (SQLite) or "oracle"
 DB_MODE = os.getenv("DB_MODE", "demo")
+DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(__file__), "demo.db"))
 
 # Oracle EBS connection (only needed if DB_MODE=oracle)
 ORACLE_HOST = os.getenv("ORACLE_HOST", "161.118.185.249")
