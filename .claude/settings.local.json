@@ -19,7 +19,12 @@
       "Bash(python create_presentation.py)",
       "Read(//c/Users/ayusi/Desktop/**)",
       "WebSearch",
-      "Bash(cd \"C:\\\\Users\\\\ayusi\\\\Desktop\\\\Customer_Master\\\\customer-master-ai\" && ls -1 DEPLOYMENT* DATABASE* COST* ARCHITECTURE* | head -20)"
+      "Bash(cd \"C:\\\\Users\\\\ayusi\\\\Desktop\\\\Customer_Master\\\\customer-master-ai\" && ls -1 DEPLOYMENT* DATABASE* COST* ARCHITECTURE* | head -20)",
+      "Bash(pip install:*)",
+      "Bash(python -c \"import mcp; print\\(mcp.__version__\\)\")",
+      "Bash(python -c \"from mcp.server.fastmcp import FastMCP; print\\(''FastMCP OK''\\)\")",
+      "Bash(python -c \"from mcp.server.fastmcp import FastMCP; mcp=FastMCP\\(''test''\\); print\\(''FastMCP OK''\\); print\\(dir\\(mcp\\)\\)\")",
+      "Bash(python -c \":*)"
     ]
   }
 }
