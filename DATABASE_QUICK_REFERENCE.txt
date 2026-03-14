@@ -1,0 +1,321 @@
+================================================================================
+CUSTOMER MASTER DATABASE - QUICK REFERENCE CARD
+================================================================================
+
+DATABASE: demo.db | TOTAL RECORDS: 205 | TOTAL TABLES: 9
+
+================================================================================
+TABLE SUMMARY
+================================================================================
+
+1. HZ_PARTIES (39 records) - Master customer/person data
+   ├─ ORGANIZATION: 26 active + 2 inactive + 1 merged = 29
+   └─ PERSON: 10 active
+
+2. HZ_CUST_ACCOUNTS (27 records) - Customer accounts with credit limits
+   ├─ ACTIVE: 17 (avg credit 28 days)
+   ├─ AT-RISK: 4 (avg credit 75 days)
+   ├─ DORMANT: 3 (avg credit 90 days)
+   └─ INACTIVE: 3
+   Total Credit Extended: $1,681,800
+
+3. HZ_PARTY_SITES (24 records) - Customer locations/addresses
+   ├─ Validated: 21 (87.5%)
+   └─ Unvalidated: 3 (12.5%)
+
+4. HZ_CONTACT_POINTS (33 records) - Email & phone contacts
+   ├─ EMAIL (Active): 26
+   ├─ EMAIL (Inactive/Bounced): 2
+   └─ PHONE (Active): 5
+
+5. HZ_RELATIONSHIPS (18 records) - Party connections
+   ├─ CUSTOMER_CONTACT: 11 (person linked to org)
+   ├─ PARTNER: 5 (business partnerships)
+   └─ PARENT_SUBSIDIARY: 2 (corporate hierarchy)
+
+6. AR_PAYMENT_SCHEDULES (22 records) - Invoices & payments
+   ├─ CLOSED: 8 invoices ($234K)
+   ├─ OPEN: 14 invoices ($309K)
+   └─ OVERDUE: 8 invoices ($128.5K) ⚠️
+
+7. OE_ORDERS (25 records) - Sales orders
+   ├─ Total Orders: 25
+   ├─ Total Sales: $600,000
+   ├─ Avg Order: $24,000
+   └─ Returns: 3 (12% return rate)
+
+8. AUDIT_LOG (17 records) - System audit trail
+   ├─ WORKFLOWS: 7 different workflows
+   ├─ ACTIONS: 9 different action types
+   └─ COVERAGE: All major operations logged
+
+9. sqlite_sequence - Internal SQLite sequence tracker
+
+================================================================================
+KEY IDENTIFIERS
+================================================================================
+
+PARTY IDs:
+  Organizations: 1001-1029
+  Persons:       2001-2010
+
+ACCOUNT IDs:
+  Accounts:      3001-3027
+
+SITE IDs:
+  Sites:         4001-4024
+
+CONTACT POINT IDs:
+  Contacts:      5001-5033
+
+RELATIONSHIP IDs:
+  Relationships: 6001-6018
+
+PAYMENT IDs:
+  Payments:      7001-7022
+
+ORDER IDs:
+  Orders:        8001-8025
+
+================================================================================
+DUPLICATE PARTIES (for testing deduplication)
+================================================================================
+
+GROUP 1: ACME
+  ├─ 1001: Acme Corporation      [ORIGINAL] Tax: US-TAX-001 DUNS: 100000001
+  ├─ 1002: Acme Corp             [DUP]
+  ├─ 1016: Acme Corp Inc         [DUP]
+  └─ 1017: ACME CORPORATION      [DUP]
+
+GROUP 2: BETA TECHNOLOGIES
+  ├─ 1003: Beta Technologies Ltd [ORIGINAL] Tax: UK-TAX-002 DUNS: 100000002
+  ├─ 1004: Beta Technologies Limited [DUP]
+  ├─ 1018: Beta Tech Ltd         [DUP]
+  └─ 1019: Beta Technologies Ltd. [DUP]
+
+================================================================================
+AT-RISK ACCOUNTS (status monitoring needed)
+================================================================================
+
+Account 3003 (Party 1005 - Gamma Supplies)
+  └─ Last Order: 2025-11-01 (131 days ago)
+  └─ State: AT-RISK | Avg Payment: 62 days
+
+Account 3020 (Party 1022 - Rho Electronics)
+  └─ Last Order: 2026-01-05 (66 days ago)
+  └─ State: AT-RISK | Avg Payment: 58 days
+
+Account 3017 (Party 1019 - Beta Tech)
+  └─ Last Order: 2025-12-15 (88 days ago)
+  └─ State: AT-RISK | Avg Payment: 85 days
+
+Account 3010 (Party 1012 - Kappa Energy)
+  └─ Last Order: 2026-02-01 (39 days ago)
+  └─ State: ACTIVE (barely) | Avg Payment: 55 days
+
+================================================================================
+DORMANT ACCOUNTS (no recent activity)
+================================================================================
+
+Account 3004 (Party 1006 - Delta Logistics)
+  └─ Last Order: 2025-07-10 (275 days ago)
+  └─ Overdue Invoice: INV-10004 ($15K, due 2025-12-01)
+
+Account 3013 (Party 1015 - Nu Transport)
+  └─ Last Order: 2025-09-01 (192 days ago)
+
+Account 3023 (Party 1025 - Upsilon Trading)
+  └─ Last Order: 2025-10-01 (162 days ago)
+
+Account 3024 (Party 1026 - Phi Ventures)
+  └─ Last Order: 2025-08-20 (204 days ago)
+
+Account 3027 (Party 1029 - Omega Services) ⚠️ CRITICAL
+  └─ Last Order: 2024-05-01 (680 days ago) - ALMOST 2 YEARS!
+  └─ Overdue Invoice: INV-10022 ($25K, due 2024-06-01)
+
+================================================================================
+OVERDUE INVOICES (CRITICAL - Action Required)
+================================================================================
+
+INV-10004: $15,000  | Party: 1006 (Delta Logistics)     | Due: 2025-12-01
+INV-10012: $19,000  | Party: 1019 (Beta Tech)          | Due: 2025-12-01
+INV-10015: $16,000  | Party: 1022 (Rho Electronics)    | Due: 2025-12-05
+INV-10018: $28,000  | Party: 1025 (Upsilon Trading)    | Due: 2026-01-01
+INV-10022: $25,000  | Party: 1029 (Omega Services)     | Due: 2024-06-01 ⚠️⚠️
+
+TOTAL OVERDUE: $128,500
+
+================================================================================
+RELATIONSHIP MAPPING
+================================================================================
+
+ACME CORPORATION (1001):
+  └─ Contacts: John Smith (2001), Jane Doe (2002)
+  └─ Subsidiary: Gamma Supplies Inc (1005)
+
+BETA TECHNOLOGIES (1003):
+  └─ Contact: Jane Doe (2002)
+  └─ Partner: Epsilon Manufacturing (1007)
+
+GAMMA SUPPLIES (1005):
+  └─ Contact: Robert Johnson (2003)
+  └─ Parent: Acme Corporation (1001)
+
+DELTA LOGISTICS (1006):
+  └─ Partner: Nu Transport Ltd (1015)
+
+SIGMA INDUSTRIES (1023):
+  └─ Parent/Subsidiary: Tau Manufacturing (1024)
+
+================================================================================
+WORKFLOW AUDIT ACTIVITIES
+================================================================================
+
+ADDRESS_VALIDATION (2 entries)
+  └─ VALIDATED action: 2 addresses verified
+
+CREDIT_ADJUSTMENT (9 entries total)
+  ├─ INCREASE: 6 credit limit increases
+  └─ DECREASE: 3 credit limit reductions
+
+DEDUPLICATION (1 entry)
+  └─ MERGE: 1 party merge (likely a test merge)
+
+CONTACT_MAINTENANCE (2 entries)
+  ├─ ADDED: 1 new contact added
+  └─ MARKED_INVALID: 1 email marked bounced
+
+RELATIONSHIP_MGMT (2 entries)
+  ├─ ADDED: 1 relationship created
+  └─ CORPORATE_RESTRUCTURE: 1 restructuring
+
+ARCHIVING (1 entry)
+  └─ ARCHIVED: 1 record archived
+
+================================================================================
+BUSINESS METRICS
+================================================================================
+
+CUSTOMER BASE:
+  Total Customers (Orgs): 29 active + 2 inactive = 31
+  Total Persons: 10
+  Total Relationships: 18
+
+ACCOUNT HEALTH:
+  Total Accounts: 27
+  Active Accounts: 17 (63%)
+  At-Risk Accounts: 4 (15%)
+  Dormant Accounts: 3 (11%)
+  Inactive Accounts: 3 (11%)
+
+CREDIT PORTFOLIO:
+  Total Credit Limit: $1,681,800
+  Avg Credit per Account: $62,289
+  Min Credit: $0
+  Max Credit: $120,000
+
+RECEIVABLES:
+  Total Invoices: 22
+  Closed Invoices: 8 ($234,000)
+  Open Invoices: 14 ($309,000)
+  Overdue Invoices: 8 ($128,500) - 41% of open balance is overdue!
+  Days Sales Outstanding (DSO): Varies by account (8-150 days)
+
+SALES PERFORMANCE:
+  Total Orders: 25
+  Total Revenue: $600,000
+  Avg Order Value: $24,000
+  Largest Order: $55,000 (Order 8019, Mar 2026)
+  Returns: 3 orders (12% return rate)
+  Return Value: ~$66,000 (estimated)
+
+================================================================================
+DATA QUALITY ISSUES
+================================================================================
+
+CONTACT ISSUES:
+  ✓ 26 active email addresses
+  ✗ 2 bounced/invalid emails
+  ✗ 7 parties with no email address
+
+ADDRESS ISSUES:
+  ✓ 21 validated addresses
+  ✗ 3 unvalidated addresses need verification
+
+MISSING DATA:
+  ✗ 5 parties missing phone numbers
+  ✗ 2 organizations missing tax reference
+  ✗ 4 organizations missing DUNS number
+
+DUPLICATE ISSUES:
+  ✗ 4 duplicate pairs found (ready for merge testing)
+  └─ Can test deduplication using find_duplicate_parties()
+
+================================================================================
+COMMON QUERIES
+================================================================================
+
+# Find all ACTIVE customers
+SELECT party_name, credit_limit, avg_days_to_pay
+FROM hz_parties p
+JOIN hz_cust_accounts a ON p.party_id = a.party_id
+WHERE a.lifecycle_state = 'ACTIVE'
+ORDER BY a.credit_limit DESC;
+
+# Get customer with all details
+SELECT p.party_id, p.party_name, p.party_type,
+       COUNT(DISTINCT a.cust_account_id) as accounts,
+       COUNT(DISTINCT s.party_site_id) as sites,
+       COUNT(DISTINCT c.contact_point_id) as contacts
+FROM hz_parties p
+LEFT JOIN hz_cust_accounts a ON p.party_id = a.party_id
+LEFT JOIN hz_party_sites s ON p.party_id = s.party_id
+LEFT JOIN hz_contact_points c ON p.party_id = c.party_id
+GROUP BY p.party_id;
+
+# Find overdue invoices
+SELECT ps.invoice_number, ps.amount_remaining, p.party_name, ps.due_date
+FROM ar_payment_schedules ps
+JOIN hz_cust_accounts a ON ps.cust_account_id = a.cust_account_id
+JOIN hz_parties p ON a.party_id = p.party_id
+WHERE ps.status = 'OP' AND ps.due_date < date('now')
+ORDER BY ps.due_date ASC;
+
+# Find all AT-RISK customers
+SELECT p.party_name, a.last_order_date,
+       julianday('now') - julianday(a.last_order_date) as days_since_order
+FROM hz_parties p
+JOIN hz_cust_accounts a ON p.party_id = a.party_id
+WHERE a.lifecycle_state = 'AT-RISK'
+ORDER BY a.last_order_date ASC;
+
+================================================================================
+SAMPLE DATA FEATURES FOR TESTING
+================================================================================
+
+✅ Duplicate Detection: 4 duplicate pairs (Acme & Beta variations)
+✅ Payment Issues: 8 overdue invoices
+✅ Lifecycle States: All 4 states represented (ACTIVE, AT-RISK, DORMANT, INACTIVE)
+✅ Relationships: Parent-subsidiary, partnerships, customer contacts
+✅ Data Quality: Validated/unvalidated addresses, bounced emails
+✅ Audit Trail: 17 audit entries covering 7 workflows
+✅ Returns: 3 return orders for RMA testing
+✅ Credit Management: Various credit limits and adjustments
+✅ Contact Coverage: Mixed active/inactive contacts
+✅ Order History: Recent and historical orders
+
+================================================================================
+FILE LOCATIONS
+================================================================================
+
+Database:           demo.db
+Schema Definition:  demo_db.py
+This Guide:         DATABASE_COMPLETE_GUIDE.md
+Quick Reference:    DATABASE_QUICK_REFERENCE.txt
+Test Data Script:   add_test_data.py
+
+================================================================================
+Last Generated: 2026-03-12
+Contact: Customer Master AI System
+================================================================================

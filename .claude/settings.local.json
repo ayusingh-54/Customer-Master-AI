@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude mcp:*)",
+      "Bash(cd \"/c/Users/ayusi/Desktop/New folder/customer-master-ai\" && python -c \"import server; print\\('✓ Server module imports successfully'\\)\")",
+      "Bash(cd \"/c/Users/ayusi/Desktop/New folder/customer-master-ai\" && python -c \"import server; print\\('Server module imports successfully'\\)\")",
+      "Bash(cd \"/c/Users/ayusi/Desktop/New folder/customer-master-ai\" && python << 'EOF'\nimport sys\nimport json\nsys.path.insert\\(0, '.'\\)\nfrom agents.deduplication import find_duplicates\n\n# Run full scan to find all duplicate customer groups\nresult = find_duplicates\\(\\)\n\n# Pretty print results\nprint\\(json.dumps\\(result, indent=2\\)\\)\nEOF)",
+      "Bash(cd \"/c/Users/ayusi/Desktop/New folder/customer-master-ai\" && python << 'EOF'\nimport sys\nsys.path.insert\\(0, '.'\\)\nfrom demo_db import get_connection\n\nconn = get_connection\\(\\)\nc = conn.cursor\\(\\)\n\n# Find both Acme parties\nparties = c.execute\\(\n    \"SELECT party_id, party_name, status FROM hz_parties WHERE party_name LIKE '%Acme%' ORDER BY party_name\"\n\\).fetchall\\(\\)\n\nfor party in parties:\n    print\\(f\"ID: {party['party_id']}, Name: {party['party_name']}, Status: {party['status']}\"\\)\n\nconn.close\\(\\)\nEOF)",
+      "Bash(cd \"/c/Users/ayusi/Desktop/New folder/customer-master-ai\" && python << 'EOF'\nimport sys\nimport json\nsys.path.insert\\(0, '.'\\)\nfrom agents.deduplication import merge_parties\n\n# Merge Acme Corp \\(1002\\) into Acme Corporation \\(1001\\)\nresult = merge_parties\\(golden_id=1001, duplicate_id=1002\\)\n\nprint\\(json.dumps\\(result, indent=2\\)\\)\nEOF)",
+      "Bash(cd \"/c/Users/ayusi/Desktop/New folder/customer-master-ai\" && python << 'EOF'\nimport sys\nimport json\nsys.path.insert\\(0, '.'\\)\nfrom agents.address import get_unvalidated_addresses\n\nresult = get_unvalidated_addresses\\(\\)\nprint\\(json.dumps\\(result, indent=2\\)\\)\nEOF)",
+      "Bash(cd \"/c/Users/ayusi/Desktop/New folder/customer-master-ai\" && python << 'EOF'\nimport sys\nimport json\nsys.path.insert\\(0, '.'\\)\nfrom agents.credit import evaluate_credit\n\nresult = evaluate_credit\\(3001\\)\nprint\\(json.dumps\\(result, indent=2\\)\\)\nEOF)",
+      "Bash(cd \"/c/Users/ayusi/Desktop/New folder/customer-master-ai\" && python << 'EOF'\nimport sys\nimport json\nsys.path.insert\\(0, '.'\\)\nfrom agents.credit import run_credit_sweep\n\nresult = run_credit_sweep\\(\\)\nprint\\(json.dumps\\(result, indent=2\\)\\)\nEOF)",
+      "Bash(cd \"/c/Users/ayusi/Desktop/New folder/customer-master-ai\" && python << 'EOF'\nimport sys\nimport json\nsys.path.insert\\(0, '.'\\)\nfrom agents.contact import mark_contact_invalid\n\nresult = mark_contact_invalid\\(5005, reason=\"BOUNCED\"\\)\nprint\\(json.dumps\\(result, indent=2\\)\\)\nEOF)",
+      "Bash(cd \"/c/Users/ayusi/Desktop/New folder/customer-master-ai\" && python << 'EOF'\nimport sys\nimport json\nsys.path.insert\\(0, '.'\\)\nfrom server import _get_customer_summary\n\nresult = _get_customer_summary\\(cust_account_id=3001\\)\nprint\\(json.dumps\\(result, indent=2\\)\\)\nEOF)",
+      "Bash(cd \"/c/Users/ayusi/Desktop/New folder/customer-master-ai\" && python << 'EOF'\nimport sys\nimport json\nsys.path.insert\\(0, '.'\\)\nfrom agents.archiving import scan_dormant_accounts\n\n# Run dry_run to report without archiving\nresult = scan_dormant_accounts\\(dry_run=True\\)\nprint\\(json.dumps\\(result, indent=2\\)\\)\nEOF)",
+      "Bash(cd \"/c/Users/ayusi/Desktop/New folder/customer-master-ai\" && python << 'EOF'\nimport sys\nimport json\nsys.path.insert\\(0, '.'\\)\nfrom server import _get_audit_log\n\nresult = _get_audit_log\\(limit=500\\)\nprint\\(json.dumps\\(result, indent=2\\)\\)\nEOF)",
+      "mcp__customer-master-data-ai__export_full_dashboard_to_excel",
+      "Bash(start \"C:\\\\Users\\\\ayusi\\\\Desktop\\\\Customer_Master_DASHBOARD_20260311_004157.xlsx\")",
+      "Bash(python create_presentation.py)",
+      "Read(//c/Users/ayusi/Desktop/**)",
+      "WebSearch",
+      "Bash(cd \"C:\\\\Users\\\\ayusi\\\\Desktop\\\\Customer_Master\\\\customer-master-ai\" && ls -1 DEPLOYMENT* DATABASE* COST* ARCHITECTURE* | head -20)"
+    ]
+  }
+}
