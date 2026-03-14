@@ -8,7 +8,7 @@ import os
 import random
 from datetime import datetime, timedelta
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "demo.db")
+DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(__file__), "demo.db"))
 
 SEED_PARTIES = [
     # (party_id, party_name, party_type, status, tax_reference, duns_number)
