@@ -102,6 +102,14 @@ SEED_PAYMENT_SCHEDULES = [
     (7006, 3011, "INV-10006", 30000, 0,     "CL", "2026-03-01"),
     (7007, 3012, "INV-10007", 22000, 22000, "OP", "2026-04-01"),
     (7008, 3010, "INV-10008", 18000, 9000,  "OP", "2026-03-15"),
+    # Extra data for richer credit scoring
+    (7009, 3004, "INV-10009", 40000, 40000, "OP", "2025-05-01"),  # very overdue
+    (7010, 3004, "INV-10010", 25000, 25000, "OP", "2025-06-15"),  # very overdue
+    (7011, 3013, "INV-10011", 12000, 12000, "OP", "2025-08-01"),  # overdue
+    (7012, 3005, "INV-10012", 5000,  0,     "CL", "2026-02-20"),
+    (7013, 3006, "INV-10013", 18000, 0,     "CL", "2026-03-01"),
+    (7014, 3009, "INV-10014", 35000, 35000, "OP", "2026-04-15"),
+    (7015, 3011, "INV-10015", 45000, 0,     "CL", "2026-02-25"),
 ]
 
 SEED_ORDERS = [
@@ -117,9 +125,81 @@ SEED_ORDERS = [
     (8009, 3009, "2026-03-05", 50000, 0),
     (8010, 3011, "2026-03-08", 30000, 0),
     (8011, 3012, "2026-03-10", 22000, 0),
+    # Extra orders for richer data
+    (8012, 3001, "2025-12-05", 15000, 0),
+    (8013, 3005, "2026-02-10", 7500,  0),
+    (8014, 3005, "2026-01-15", 9200,  0),
+    (8015, 3009, "2026-02-20", 42000, 0),
+    (8016, 3011, "2026-02-15", 55000, 0),
+    (8017, 3003, "2025-10-05", 8000,  1),  # return — hurts credit score
+    (8018, 3004, "2025-06-01", 20000, 1),  # return — hurts credit score
+    (8019, 3013, "2025-08-15", 15000, 1),  # return
+    (8020, 3002, "2025-12-10", 18000, 0),
 ]
 
-SEED_AUDIT_LOG = []
+SEED_AUDIT_LOG = [
+    # (workflow, entity_type, entity_id, action, details)
+    # ── Workflow 1: DEDUPLICATION ──
+    ("DEDUPLICATION", "HZ_PARTIES", 1001, "DUPLICATE_SCAN",
+     '{"scanned": 14, "duplicate_groups_found": 2, "threshold": 0.88}'),
+    ("DEDUPLICATION", "HZ_PARTIES", 1001, "MERGE",
+     '{"golden_id": 1001, "merged_id": 1002, "golden_name": "Acme Corporation", '
+     '"merged_name": "Acme Corp", "steps": ["Redirected 0 customer accounts", '
+     '"Redirected 0 party sites", "Redirected 0 contact points", "Redirected 0 relationships"]}'),
+    # ── Workflow 2: ADDRESS_VALIDATION ──
+    ("ADDRESS_VALIDATION", "HZ_PARTY_SITES", 4001, "VALIDATED",
+     '{"address": "100 Main Street", "city": "New York", "lat": 40.7128, "lon": -74.006}'),
+    ("ADDRESS_VALIDATION", "HZ_PARTY_SITES", 4002, "VALIDATED",
+     '{"address": "50 Oxford Street", "city": "London", "lat": 51.5074, "lon": -0.1278}'),
+    ("ADDRESS_VALIDATION", "HZ_PARTY_SITES", 4005, "VALIDATION_FAILED",
+     '{"address": "999 Industrial Rd", "issues": ["Address not verified — missing validated postal data"]}'),
+    # ── Workflow 3: CREDIT_ADJUSTMENT ──
+    ("CREDIT_ADJUSTMENT", "HZ_CUST_ACCOUNTS", 3005, "INCREASE",
+     '{"cust_account_id": 3005, "party_name": "Epsilon Manufacturing", "account_number": "ACC-1007", '
+     '"current_limit": 25000, "new_limit": 28750, "score": 3, '
+     '"reasons": ["Excellent payment speed (<20 days)", "No overdue invoices"]}'),
+    ("CREDIT_ADJUSTMENT", "HZ_CUST_ACCOUNTS", 3009, "INCREASE",
+     '{"cust_account_id": 3009, "party_name": "Iota Finance", "account_number": "ACC-1011", '
+     '"current_limit": 80000, "new_limit": 92000, "score": 3, '
+     '"reasons": ["Excellent payment speed (<20 days)", "No overdue invoices"]}'),
+    ("CREDIT_ADJUSTMENT", "HZ_CUST_ACCOUNTS", 3003, "DECREASE",
+     '{"cust_account_id": 3003, "party_name": "Gamma Supplies Inc", "account_number": "ACC-1005", '
+     '"current_limit": 30000, "new_limit": 22500, "score": -4, '
+     '"reasons": ["Very slow payment (>60 days)", "1 overdue invoice(s)", "Elevated return rate: 33%"]}'),
+    ("CREDIT_ADJUSTMENT", "HZ_CUST_ACCOUNTS", 3004, "DECREASE",
+     '{"cust_account_id": 3004, "party_name": "Delta Logistics", "account_number": "ACC-1006", '
+     '"current_limit": 100000, "new_limit": 75000, "score": -5, '
+     '"reasons": ["Very slow payment (>60 days)", "2 overdue invoices — high risk", "High return rate: 50%"]}'),
+    ("CREDIT_ADJUSTMENT", "HZ_CUST_ACCOUNTS", 3011, "INCREASE",
+     '{"cust_account_id": 3011, "party_name": "Lambda Healthcare", "account_number": "ACC-1013", '
+     '"current_limit": 120000, "new_limit": 138000, "score": 3, '
+     '"reasons": ["Excellent payment speed (<20 days)", "No overdue invoices"]}'),
+    # ── Workflow 4: CONTACT_MAINTENANCE ──
+    ("CONTACT_MAINTENANCE", "HZ_CONTACT_POINTS", 5005, "MARKED_INVALID",
+     '{"reason": "BOUNCED", "value": "BOUNCED-old@gamma.com", "alternates_found": 1}'),
+    ("CONTACT_MAINTENANCE", "HZ_CONTACT_POINTS", 5009, "MARKED_INVALID",
+     '{"reason": "INVALID", "value": null, "alternates_found": 0}'),
+    ("CONTACT_MAINTENANCE", "HZ_CONTACT_POINTS", 5013, "ADDED",
+     '{"party_id": 1008, "type": "EMAIL", "value": "support@zeta-services.com"}'),
+    # ── Workflow 5: RELATIONSHIP_MGMT ──
+    ("RELATIONSHIP_MGMT", "HZ_RELATIONSHIPS", 6005, "VERIFIED",
+     '{"subject": "Acme Corporation", "object": "Gamma Supplies Inc", "type": "PARENT_SUBSIDIARY"}'),
+    ("RELATIONSHIP_MGMT", "HZ_RELATIONSHIPS", 6008, "ADDED",
+     '{"subject_id": 1011, "object_id": 1012, "type": "PARTNER", '
+     '"subject_name": "Iota Finance", "object_name": "Kappa Energy"}'),
+    # ── Workflow 6: ARCHIVING ──
+    ("ARCHIVING", "HZ_CUST_ACCOUNTS", 3007, "SCAN_DORMANT",
+     '{"party_name": "Eta Consulting Group", "account_number": "ACC-1009", '
+     '"last_order": "2024-03-01", "days_inactive": 744, "can_archive": true, "blockers": []}'),
+    ("ARCHIVING", "HZ_CUST_ACCOUNTS", 3008, "ARCHIVED",
+     '{"party_name": "Theta Retail Co", "account_number": "ACC-1010", '
+     '"last_order": "2022-01-01", "days_inactive": 1534, "status": "INACTIVE"}'),
+    ("ARCHIVING", "HZ_CUST_ACCOUNTS", 0, "LIFECYCLE_SYNC",
+     '{"status": "UPDATED", "breakdown": {"ACTIVE": 7, "AT-RISK": 1, "DORMANT": 3, "INACTIVE": 2, "PROSPECT": 0}, "total": 13}'),
+]
+
+
+_DB_SCHEMA_VERSION = 2  # bump to force re-seed on next deploy
 
 
 def get_connection():
@@ -129,11 +209,22 @@ def get_connection():
 
 
 def init_db():
-    if os.path.exists(DB_PATH):
-        return  # already seeded
-
     conn = get_connection()
     c = conn.cursor()
+
+    # Version check — re-seed when schema version bumps
+    c.execute("CREATE TABLE IF NOT EXISTS _meta (key TEXT PRIMARY KEY, value TEXT)")
+    row = c.execute("SELECT value FROM _meta WHERE key='schema_version'").fetchone()
+    if row and int(row[0]) >= _DB_SCHEMA_VERSION:
+        conn.close()
+        return  # already up to date
+
+    # Drop all data tables to re-seed cleanly
+    for table in [
+        "audit_log", "oe_orders", "ar_payment_schedules", "hz_relationships",
+        "hz_contact_points", "hz_party_sites", "hz_cust_accounts", "hz_parties",
+    ]:
+        c.execute(f"DROP TABLE IF EXISTS {table}")
 
     c.executescript("""
     CREATE TABLE IF NOT EXISTS hz_parties (
@@ -270,6 +361,15 @@ def init_db():
             else:
                 state = 'INACTIVE'
         c.execute("UPDATE hz_cust_accounts SET lifecycle_state=? WHERE cust_account_id=?", (state, row[0]))
+
+    # Seed audit log with representative entries for all 6 workflows
+    c.executemany(
+        "INSERT INTO audit_log(workflow,entity_type,entity_id,action,details) VALUES (?,?,?,?,?)",
+        SEED_AUDIT_LOG
+    )
+
+    # Stamp version
+    c.execute("INSERT OR REPLACE INTO _meta VALUES ('schema_version', ?)", (str(_DB_SCHEMA_VERSION),))
 
     conn.commit()
     conn.close()

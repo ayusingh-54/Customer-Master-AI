@@ -295,6 +295,12 @@ def _init_database() -> None:
 async def lifespan(application: FastAPI):
     logger.info("Starting Customer Master AI (env=%s)", config.ENVIRONMENT)
     _init_database()
+    # Keep lifecycle states fresh on every boot
+    try:
+        result = _sync_lifecycle()
+        logger.info("Lifecycle sync: %s", result.get("breakdown", {}))
+    except Exception:
+        logger.exception("Lifecycle sync failed (non-fatal)")
     logger.info("All systems ready.")
     yield
     logger.info("Customer Master AI shut down.")
