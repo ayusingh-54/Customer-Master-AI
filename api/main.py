@@ -61,6 +61,7 @@ from slowapi.errors import RateLimitExceeded
 
 # ── MCP ───────────────────────────────────────────────────────────────────────
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 # ── Agent imports (aliased to avoid name clashes with MCP tool functions) ─────
 import demo_db
@@ -336,7 +337,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # SYSTEM ENDPOINTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-@app.get("/", tags=["System"], summary="API info")
+@app.api_route("/", methods=["GET", "HEAD"], tags=["System"], summary="API info")
 async def root():
     return {
         "service":    "Customer Master AI",
@@ -818,7 +819,28 @@ async def export_dashboard_endpoint(request: Request, _: str = Depends(verify_ap
 # MCP SERVER — HTTP / SSE transport (Claude Desktop connects here)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-mcp = FastMCP("customer-master-ai")
+_RENDER_HOST = "customer-master-ai.onrender.com"
+
+mcp = FastMCP(
+    "customer-master-ai",
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=[
+            "127.0.0.1:*",
+            "localhost:*",
+            "[::1]:*",
+            _RENDER_HOST,
+            f"{_RENDER_HOST}:*",
+        ],
+        allowed_origins=[
+            "http://127.0.0.1:*",
+            "http://localhost:*",
+            "http://[::1]:*",
+            f"https://{_RENDER_HOST}",
+            f"https://{_RENDER_HOST}:*",
+        ],
+    ),
+)
 
 
 # ── Search & Query ─────────────────────────────────────────────────────────────
