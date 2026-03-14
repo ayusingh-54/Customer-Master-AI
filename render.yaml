@@ -1,0 +1,66 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Customer Master AI — Render Infrastructure as Code
+#
+# Deploy:  render blueprint apply --file render.yaml
+# Or:      Connect GitHub repo in Render Dashboard → "New Blueprint"
+#
+# Services:
+#   customer-master-ai   Web service (FastAPI + MCP SSE)
+#
+# Persistent disk:       /data  (SQLite database + exports)
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  - type: web
+    name: customer-master-ai
+    runtime: docker
+
+    # Render plan — "starter" ($7/mo) is required for persistent disk.
+    # Upgrade to "standard" ($25/mo) for auto-scaling + more RAM.
+    plan: starter
+
+    # Docker build context is the repo root
+    dockerfilePath: ./Dockerfile
+
+    # Render injects $PORT automatically; our Dockerfile binds to it.
+    # healthCheckPath is polled by Render's load-balancer.
+    healthCheckPath: /health
+
+    # ── Environment variables ─────────────────────────────────────────────────
+    envVars:
+      # Database
+      - key: DB_MODE
+        value: demo
+
+      - key: DB_PATH
+        value: /data/demo.db          # lives on the persistent disk below
+
+      # Server
+      - key: PORT
+        value: "10000"
+
+      - key: ENVIRONMENT
+        value: production
+
+      - key: LOG_LEVEL
+        value: INFO
+
+      - key: WORKERS
+        value: "1"                    # 1 worker for SQLite (no concurrent writes)
+
+      # Auth — Render generates a cryptographically random secret at deploy time.
+      # Copy it from the Render dashboard (Environment tab) to use the REST API.
+      - key: API_SECRET_KEY
+        generateValue: true
+
+      # ── Secrets: set these manually in the Render dashboard ─────────────────
+      # Never commit real values here.
+      - key: ANTHROPIC_API_KEY
+        sync: false                   # "sync: false" = prompt operator to set
+
+    # ── Persistent disk ───────────────────────────────────────────────────────
+    # Survives deploys and restarts.  Stores demo.db + any Excel exports.
+    disk:
+      name: customer-master-data
+      mountPath: /data
+      sizeGB: 1
