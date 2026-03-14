@@ -52,7 +52,6 @@ logger = logging.getLogger("customer-master-ai")
 # ── Web framework imports ─────────────────────────────────────────────────────
 from fastapi import FastAPI, HTTPException, Security, Request, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
@@ -316,18 +315,9 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# ── Trusted Host Middleware ───────────────────────────────────────────────────
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=[
-        "customer-master-ai.onrender.com",
-        "localhost",
-        "127.0.0.1",
-        "*.onrender.com",
-    ],
-)
-
 # ── CORS ──────────────────────────────────────────────────────────────────────
+# Allow all origins (CORS fully open). Host validation not needed since endpoints
+# require either API key auth or are read-only (health, docs, MCP SSE).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
