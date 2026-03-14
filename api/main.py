@@ -322,9 +322,7 @@ app.add_middleware(
     allowed_hosts=[
         "customer-master-ai.onrender.com",
         "localhost",
-        "localhost:*",
         "127.0.0.1",
-        "127.0.0.1:*",
         "*.onrender.com",
     ],
 )
