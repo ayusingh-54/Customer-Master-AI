@@ -24,7 +24,9 @@
       "Bash(python -c \"import mcp; print\\(mcp.__version__\\)\")",
       "Bash(python -c \"from mcp.server.fastmcp import FastMCP; print\\(''FastMCP OK''\\)\")",
       "Bash(python -c \"from mcp.server.fastmcp import FastMCP; mcp=FastMCP\\(''test''\\); print\\(''FastMCP OK''\\); print\\(dir\\(mcp\\)\\)\")",
-      "Bash(python -c \":*)"
+      "Bash(python -c \":*)",
+      "Bash(curl -s -X POST \"https://customer-master-ai.onrender.com/api/v1/deduplication/find-duplicates\" -H \"Content-Type: application/json\" -H \"X-API-Key: demo\" -d '{\"\"threshold\"\": 0.7}')",
+      "Bash(curl -s \"https://customer-master-ai.onrender.com/openapi.json\")"
     ]
   }
 }

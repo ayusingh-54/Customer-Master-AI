@@ -1,6 +1,6 @@
-.venv 
+.venv
 .idea
-__pycache__ 
+__pycache__
 *.pyc
 *.pyo
 *.pyd
@@ -9,3 +9,15 @@ env/
 
 # VS Code settings
 .vscode/
+
+# Secrets — NEVER commit
+.env
+.env.local
+*.env
+
+# Database (reseeds automatically)
+demo.db
+
+# Generated files
+*.xlsx
+*.pptx
