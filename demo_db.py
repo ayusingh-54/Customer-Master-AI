@@ -5,6 +5,7 @@ Seeds 50 parties, 20 accounts, addresses, contacts, and relationships.
 
 import sqlite3
 import os
+import hashlib
 import random
 from datetime import datetime, timedelta
 
@@ -199,12 +200,27 @@ SEED_AUDIT_LOG = [
 ]
 
 
-_DB_SCHEMA_VERSION = 2  # bump to force re-seed on next deploy
+def _hash_key(key: str) -> str:
+    """SHA-256 hash for API key storage."""
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
+# Demo API keys — one per tier (plaintext shown here for testing only)
+SEED_API_KEYS = [
+    # (api_key_hash, api_key_prefix, customer_name, tier, quota_limit)
+    (_hash_key("cm_sk_starter_demo_key_2026"),      "cm_sk_st", "Demo Starter Co",        "starter",      500),
+    (_hash_key("cm_sk_professional_demo_key_2026"),  "cm_sk_pr", "Demo Professional Inc",  "professional", 2000),
+    (_hash_key("cm_sk_enterprise_demo_key_2026"),    "cm_sk_en", "Demo Enterprise Corp",   "enterprise",   10000),
+]
+
+
+_DB_SCHEMA_VERSION = 3  # bump to force re-seed on next deploy
 
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")  # concurrent read/write safety
     return conn
 
 
@@ -221,6 +237,7 @@ def init_db():
 
     # Drop all data tables to re-seed cleanly
     for table in [
+        "usage_log", "api_keys",
         "audit_log", "oe_orders", "ar_payment_schedules", "hz_relationships",
         "hz_contact_points", "hz_party_sites", "hz_cust_accounts", "hz_parties",
     ]:
@@ -310,6 +327,31 @@ def init_db():
         details          TEXT,
         performed_at     TEXT DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS api_keys (
+        key_id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        api_key_hash    TEXT NOT NULL UNIQUE,
+        api_key_prefix  TEXT NOT NULL,
+        customer_name   TEXT NOT NULL,
+        tier            TEXT NOT NULL DEFAULT 'starter',
+        quota_limit     INTEGER NOT NULL DEFAULT 500,
+        quota_used      INTEGER NOT NULL DEFAULT 0,
+        quota_reset_at  TEXT NOT NULL DEFAULT (datetime('now', '+1 day')),
+        is_active       INTEGER NOT NULL DEFAULT 1,
+        created_at      TEXT DEFAULT (datetime('now')),
+        expires_at      TEXT
+    );
+    CREATE TABLE IF NOT EXISTS usage_log (
+        log_id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        api_key_id          INTEGER NOT NULL,
+        tool_name           TEXT,
+        endpoint            TEXT,
+        request_timestamp   TEXT DEFAULT (datetime('now')),
+        response_time_ms    INTEGER,
+        status_code         INTEGER,
+        FOREIGN KEY (api_key_id) REFERENCES api_keys(key_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_usage_log_key_ts
+        ON usage_log(api_key_id, request_timestamp);
     """)
 
     c.executemany(
@@ -367,6 +409,15 @@ def init_db():
         "INSERT INTO audit_log(workflow,entity_type,entity_id,action,details) VALUES (?,?,?,?,?)",
         SEED_AUDIT_LOG
     )
+
+    # Seed demo API keys (one per tier)
+    for key_hash, prefix, name, tier, quota in SEED_API_KEYS:
+        c.execute(
+            "INSERT OR IGNORE INTO api_keys"
+            "(api_key_hash, api_key_prefix, customer_name, tier, quota_limit) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (key_hash, prefix, name, tier, quota),
+        )
 
     # Stamp version
     c.execute("INSERT OR REPLACE INTO _meta VALUES ('schema_version', ?)", (str(_DB_SCHEMA_VERSION),))

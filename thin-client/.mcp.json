@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "customer-master-ai": {
+      "url": "https://customer-master-ai.onrender.com/mcp/sse",
+      "headers": {
+        "X-API-Key": "${CUSTOMER_MASTER_API_KEY}"
+      }
+    }
+  }
+}

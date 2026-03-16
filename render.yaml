@@ -53,6 +53,10 @@ services:
       - key: API_SECRET_KEY
         generateValue: true
 
+      # Admin key — for managing customer API keys via /api/admin/*
+      - key: ADMIN_API_KEY
+        generateValue: true
+
       # ── Secrets: set these manually in the Render dashboard ─────────────────
       # Never commit real values here.
       - key: ANTHROPIC_API_KEY

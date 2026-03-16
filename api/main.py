@@ -28,10 +28,13 @@ Auth: X-API-Key header (set API_SECRET_KEY env var; omit for open dev mode)
 import os
 import sys
 import json
+import hashlib
 import logging
 import shutil
 import tempfile
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from typing import Optional
 
 # ── Path setup (ensure project root importable) ───────────────────────────────
@@ -62,6 +65,11 @@ from slowapi.errors import RateLimitExceeded
 # ── MCP ───────────────────────────────────────────────────────────────────────
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+
+# ── Tier permissions & middleware ─────────────────────────────────────────────
+from tier_permissions import is_tool_allowed
+from middleware import resolve_tool_name, TelemetryMiddleware
+from api.admin import router as admin_router
 
 # ── Agent imports (aliased to avoid name clashes with MCP tool functions) ─────
 import demo_db
@@ -106,28 +114,153 @@ from agents.excel_export import (
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# AUTH
+# AUTH — Tier-based API key gateway
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
-async def verify_api_key(api_key: Optional[str] = Security(_api_key_header)) -> str:
+@dataclass
+class APIKeyMetadata:
+    key_id: int = 0
+    customer_name: str = ""
+    tier: str = "enterprise"
+    quota_limit: int = 10000
+    quota_used: int = 0
+    is_dev: bool = False
+
+
+async def verify_api_key(
+    request: Request,
+    api_key: Optional[str] = Security(_api_key_header),
+) -> APIKeyMetadata:
     """
-    Validates X-API-Key header.
-    If API_SECRET_KEY == 'dev-secret-key' or is unset, auth is OPEN (dev mode).
-    In production Render auto-generates a random key via generateValue: true.
+    Multi-step API key validation:
+    1. Dev mode bypass (API_SECRET_KEY == 'dev-secret-key')
+    2. Accept both X-API-Key and Authorization: Bearer headers
+    3. SHA-256 lookup in api_keys table
+    4. Fallback: master key (API_SECRET_KEY) → enterprise tier
+    5. Check is_active, expires_at, quota
     """
     secret = config.API_SECRET_KEY
+
+    # 1. Dev mode — open auth for local development
     if not secret or secret == "dev-secret-key":
-        return "dev"
-    if api_key != secret:
+        meta = APIKeyMetadata(is_dev=True)
+        request.state.key_meta = meta
+        return meta
+
+    # 2. Accept Authorization: Bearer header as alternative
+    if not api_key:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            api_key = auth_header[7:]
+
+    if not api_key:
         raise HTTPException(
             status_code=401,
-            detail="Missing or invalid X-API-Key header.",
+            detail="Missing API key. Provide X-API-Key header or Authorization: Bearer token.",
             headers={"WWW-Authenticate": "ApiKey"},
         )
-    return api_key
+
+    # 3. Look up hashed key in api_keys table
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    conn = demo_db.get_connection()
+    row = conn.execute(
+        "SELECT key_id, customer_name, tier, quota_limit, quota_used, "
+        "quota_reset_at, is_active, expires_at FROM api_keys WHERE api_key_hash=?",
+        (key_hash,),
+    ).fetchone()
+
+    # 4. Fallback: if key matches API_SECRET_KEY directly → enterprise master key
+    if not row:
+        conn.close()
+        if api_key == secret:
+            meta = APIKeyMetadata(key_id=0, customer_name="master", tier="enterprise")
+            request.state.key_meta = meta
+            return meta
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid API key.",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+
+    # 5. Validate key state
+    if not row["is_active"]:
+        conn.close()
+        raise HTTPException(status_code=403, detail="API key has been revoked.")
+
+    if row["expires_at"]:
+        try:
+            exp = datetime.fromisoformat(row["expires_at"])
+            if datetime.utcnow() > exp:
+                conn.close()
+                raise HTTPException(status_code=403, detail="API key has expired.")
+        except ValueError:
+            pass
+
+    # 6. Quota check (lazy reset)
+    quota_used = row["quota_used"]
+    quota_limit = row["quota_limit"]
+    reset_at = row["quota_reset_at"]
+
+    try:
+        reset_dt = datetime.fromisoformat(reset_at)
+        if datetime.utcnow() > reset_dt:
+            # Reset quota window
+            quota_used = 0
+            new_reset = (datetime.utcnow() + timedelta(hours=24)).isoformat()
+            conn.execute(
+                "UPDATE api_keys SET quota_used=0, quota_reset_at=? WHERE key_id=?",
+                (new_reset, row["key_id"]),
+            )
+    except (ValueError, TypeError):
+        pass
+
+    if quota_used >= quota_limit:
+        conn.close()
+        raise HTTPException(
+            status_code=429,
+            detail=f"Quota exceeded ({quota_limit} calls/day). Resets at {reset_at}.",
+        )
+
+    # 7. Increment usage counter
+    conn.execute(
+        "UPDATE api_keys SET quota_used=quota_used+1 WHERE key_id=?",
+        (row["key_id"],),
+    )
+    conn.commit()
+    conn.close()
+
+    meta = APIKeyMetadata(
+        key_id=row["key_id"],
+        customer_name=row["customer_name"],
+        tier=row["tier"],
+        quota_limit=quota_limit,
+        quota_used=quota_used + 1,
+    )
+    request.state.key_meta = meta
+    return meta
+
+
+async def enforce_tier(
+    request: Request,
+    key_meta: APIKeyMetadata = Depends(verify_api_key),
+) -> APIKeyMetadata:
+    """Check if the current key's tier allows access to the requested endpoint."""
+    if key_meta.is_dev:
+        return key_meta
+
+    path = request.url.path
+    tool_name = resolve_tool_name(path)
+
+    if tool_name and not is_tool_allowed(key_meta.tier, tool_name):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Tool '{tool_name}' is not available on your '{key_meta.tier}' tier. "
+                   f"Upgrade to access this feature.",
+        )
+    return key_meta
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -333,10 +466,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Telemetry middleware ──────────────────────────────────────────────────────
+app.add_middleware(TelemetryMiddleware)
+
 # ── Rate limiter ──────────────────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# ── Admin router (key management + usage analytics) ──────────────────────────
+app.include_router(admin_router)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -377,7 +516,7 @@ async def health():
 async def search_parties_endpoint(
     request: Request,
     body: SearchRequest,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _search_parties(body.query, body.party_type, body.limit)
@@ -391,7 +530,7 @@ async def search_parties_endpoint(
 async def customer_summary_endpoint(
     request: Request,
     body: CustomerSummaryRequest,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _get_customer_summary(body.cust_account_id, body.account_number)
@@ -404,7 +543,7 @@ async def customer_summary_endpoint(
 async def audit_log_endpoint(
     request: Request,
     body: AuditLogRequest,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _get_audit_log(body.workflow, body.limit)
@@ -425,7 +564,7 @@ async def audit_log_endpoint(
 async def find_duplicates_endpoint(
     request: Request,
     body: FindDuplicatesRequest,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _find_duplicates(body.party_name, body.party_type, body.threshold)
@@ -442,7 +581,7 @@ async def find_duplicates_endpoint(
 async def merge_parties_endpoint(
     request: Request,
     body: MergeRequest,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _merge_parties(body.golden_id, body.duplicate_id)
@@ -463,7 +602,7 @@ async def merge_parties_endpoint(
 async def validate_address_endpoint(
     request: Request,
     body: ValidateAddressRequest,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _validate_address(body.party_site_id, body.party_id)
@@ -479,7 +618,7 @@ async def validate_address_endpoint(
 @limiter.limit("30/minute")
 async def unvalidated_addresses_endpoint(
     request: Request,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _get_unvalidated_addresses()
@@ -500,7 +639,7 @@ async def unvalidated_addresses_endpoint(
 async def evaluate_credit_endpoint(
     request: Request,
     body: AccountIdRequest,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _eval_credit(body.cust_account_id)
@@ -517,7 +656,7 @@ async def evaluate_credit_endpoint(
 async def apply_credit_endpoint(
     request: Request,
     body: AccountIdRequest,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _apply_credit(body.cust_account_id)
@@ -533,7 +672,7 @@ async def apply_credit_endpoint(
 @limiter.limit("5/minute")
 async def credit_sweep_endpoint(
     request: Request,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _run_credit_sweep()
@@ -554,7 +693,7 @@ async def credit_sweep_endpoint(
 @limiter.limit("30/minute")
 async def parties_needing_contact_endpoint(
     request: Request,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _get_parties_needing_contact()
@@ -571,7 +710,7 @@ async def parties_needing_contact_endpoint(
 async def get_contacts_endpoint(
     request: Request,
     party_id: int,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _get_contacts(party_id)
@@ -588,7 +727,7 @@ async def get_contacts_endpoint(
 async def mark_contact_invalid_endpoint(
     request: Request,
     body: MarkContactInvalidRequest,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _mark_contact_invalid(body.contact_point_id, body.reason)
@@ -605,7 +744,7 @@ async def mark_contact_invalid_endpoint(
 async def add_contact_endpoint(
     request: Request,
     body: AddContactRequest,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _add_contact_point(body.party_id, body.contact_type, body.contact_value)
@@ -626,7 +765,7 @@ async def add_contact_endpoint(
 @limiter.limit("30/minute")
 async def relationship_graph_endpoint(
     request: Request,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _get_rel_graph()
@@ -643,7 +782,7 @@ async def relationship_graph_endpoint(
 async def get_relationships_endpoint(
     request: Request,
     party_id: int,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _get_relationships(party_id)
@@ -660,7 +799,7 @@ async def get_relationships_endpoint(
 async def add_relationship_endpoint(
     request: Request,
     body: AddRelationshipRequest,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _add_relationship(body.subject_id, body.object_id, body.rel_type)
@@ -677,7 +816,7 @@ async def add_relationship_endpoint(
 async def restructure_endpoint(
     request: Request,
     body: RestructureRequest,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _update_restructure(body.old_parent_id, body.new_parent_id)
@@ -698,7 +837,7 @@ async def restructure_endpoint(
 async def scan_dormant_endpoint(
     request: Request,
     body: ScanDormantRequest,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _scan_dormant(body.dry_run)
@@ -714,7 +853,7 @@ async def scan_dormant_endpoint(
 @limiter.limit("5/minute")
 async def sync_lifecycle_endpoint(
     request: Request,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _sync_lifecycle()
@@ -778,7 +917,7 @@ async def export_credit_endpoint(request: Request, _: str = Depends(verify_api_k
 async def export_duplicates_endpoint(
     request: Request,
     threshold: float = 0.88,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _stream_excel(_export_duplicates, threshold=threshold)
@@ -791,7 +930,7 @@ async def export_duplicates_endpoint(
 async def export_audit_endpoint(
     request: Request,
     workflow: Optional[str] = None,
-    _: str = Depends(verify_api_key),
+    key_meta: APIKeyMetadata = Depends(enforce_tier),
 ):
     try:
         return _stream_excel(_export_audit, workflow=workflow)

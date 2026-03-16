@@ -9,6 +9,7 @@ LOG_LEVEL      = os.getenv("LOG_LEVEL", "INFO")
 PORT           = int(os.getenv("PORT", "10000"))
 WORKERS        = int(os.getenv("WORKERS", "1"))
 API_SECRET_KEY = os.getenv("API_SECRET_KEY", "dev-secret-key")
+ADMIN_API_KEY  = os.getenv("ADMIN_API_KEY", "")
 
 # ── Database ──────────────────────────────────────────────────────────────────
 # Database mode: "demo" (SQLite) or "oracle"
