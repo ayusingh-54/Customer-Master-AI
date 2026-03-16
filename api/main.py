@@ -1175,11 +1175,7 @@ def sync_lifecycle_states() -> dict:
     return _sync_lifecycle()
 
 
-# ── Mount MCP SSE ─────────────────────────────────────────────────────────────
-# Two mount points for compatibility:
-#   /mcp/sse    → legacy path (Claude Desktop)
-#   /sse        → standard path (Claude Code thin-client, uses ?apiKey= param)
-# Both are the same MCP server, just mounted at different paths.
-_sse_app = mcp.sse_app()
-app.mount("/mcp", _sse_app)
-app.mount("/sse", _sse_app)
+# ── Mount MCP SSE at /mcp ─────────────────────────────────────────────────────
+# Claude Code/Desktop connects via:  GET https://<host>/mcp/sse?apiKey=<key>
+# MCP messages endpoint:             POST https://<host>/mcp/messages/
+app.mount("/mcp", mcp.sse_app())

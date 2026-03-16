@@ -2,7 +2,7 @@
   "mcpServers": {
     "customer-master-ai": {
       "type": "sse",
-      "url": "https://customer-master-ai.onrender.com/sse?apiKey=${CUSTOMER_MASTER_API_KEY}"
+      "url": "https://customer-master-ai.onrender.com/mcp/sse?apiKey=${CUSTOMER_MASTER_API_KEY}"
     }
   }
 }
