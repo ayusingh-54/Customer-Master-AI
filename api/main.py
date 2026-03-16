@@ -156,10 +156,14 @@ async def verify_api_key(
         if auth_header.startswith("Bearer "):
             api_key = auth_header[7:]
 
+    # 3. Accept ?apiKey= query parameter (required for MCP SSE clients)
+    if not api_key:
+        api_key = request.query_params.get("apiKey")
+
     if not api_key:
         raise HTTPException(
             status_code=401,
-            detail="Missing API key. Provide X-API-Key header or Authorization: Bearer token.",
+            detail="Missing API key. Provide X-API-Key header, Authorization: Bearer, or ?apiKey= param.",
             headers={"WWW-Authenticate": "ApiKey"},
         )
 
@@ -1171,7 +1175,11 @@ def sync_lifecycle_states() -> dict:
     return _sync_lifecycle()
 
 
-# ── Mount MCP SSE at /mcp ─────────────────────────────────────────────────────
-# Claude Desktop connects via:  GET  https://<host>/mcp/sse
-# MCP messages endpoint:        POST https://<host>/mcp/messages/
-app.mount("/mcp", mcp.sse_app())
+# ── Mount MCP SSE ─────────────────────────────────────────────────────────────
+# Two mount points for compatibility:
+#   /mcp/sse    → legacy path (Claude Desktop)
+#   /sse        → standard path (Claude Code thin-client, uses ?apiKey= param)
+# Both are the same MCP server, just mounted at different paths.
+_sse_app = mcp.sse_app()
+app.mount("/mcp", _sse_app)
+app.mount("/sse", _sse_app)
